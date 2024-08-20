@@ -41,6 +41,59 @@ def quantize_image(image_path, n_colors):
     
     return quantized_image, (labels_reshaped, centers)
 
+def save_individual_colors(image_shape, labels, centers, output_dir, base_filename):
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    h, w = image_shape[:2]
+    
+    # For each color center
+    for i, color in enumerate(centers):
+        # Create a blank image (white background)
+        color_image = np.ones((h, w, 3), dtype=np.uint8) * 255
+        
+        # Set pixels that match this color
+        mask = (labels == i)
+        color_image[mask] = color
+        
+        # Save this color image
+        color_dir = os.path.join(output_dir, "colors")
+        os.makedirs(color_dir, exist_ok=True)
+        color_filename = os.path.join(color_dir, f"{base_filename}_color_{i}.png")
+        cv2.imwrite(color_filename, color_image)
+        print(f"Color {i} (RGB: {color}) saved to {color_filename}")
+        
+        # Also save a binary mask of this color
+        mask_dir = os.path.join(output_dir, "masks")
+        os.makedirs(mask_dir, exist_ok=True)
+        mask_image = np.zeros((h, w, 3), dtype=np.uint8)
+        mask_image[mask] = [255, 255, 255]  # White where this color appears
+        mask_filename = os.path.join(mask_dir, f"{base_filename}_mask_{i}.png")
+        cv2.imwrite(mask_filename, mask_image)
+        print(f"Mask for color {i} saved to {mask_filename}")
+        
+        # Create a transparent background image with CORRECT COLOR ORDER
+        transparent_image = np.zeros((h, w, 4), dtype=np.uint8)
+        # Initialize all pixels as fully transparent (alpha = 0)
+        transparent_image[..., 3] = 0
+        
+        # Set color for matched pixels
+        transparent_mask = np.zeros((h, w, 4), dtype=np.uint8)
+        transparent_mask[mask] = np.append(color, 255)  # RGB + Alpha
+        
+        # Update only the matched pixels in the transparent image
+        transparent_image = transparent_mask
+        
+        # Save the transparent background image
+        transparent_dir = os.path.join(output_dir, "transparent_colors")
+        os.makedirs(transparent_dir, exist_ok=True)
+        transparent_filename = os.path.join(transparent_dir, f"{base_filename}_transparent_color_{i}.png")
+        
+        # Save directly without color conversion since we've already handled BGR ordering
+        cv2.imwrite(transparent_filename, transparent_image)
+        print(f"Transparent color {i} (RGB: {color}) saved to {transparent_filename}")
+
+
 def update_color(quantized_image, labels, centers, new_centers):
     """
     Update colors in the quantized image and return new versions of all outputs.
